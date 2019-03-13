@@ -5,6 +5,7 @@ import cv2
 from random import shuffle, random
 from operator import itemgetter
 from time import clock
+from math import sqrt
 # neural network imports
 from keras.models import Sequential, load_model
 from keras.layers import Dense, Activation, Conv2D, MaxPooling2D, Flatten, Dropout, LeakyReLU
@@ -454,6 +455,50 @@ def get_k_centroids(heat_map,hottest_value,k):
 	#cv2.destroyAllWindows()
 
 	return centroids
+
+def get_neck_centroid(heat_map,hottest_value,head_top_position):
+
+	centroids = []
+	largest_contours = []
+	thresh_value = 75
+
+	print('head top position:',head_top_position)
+
+	#if(hottest_value<thresh_value):
+	#	thresh_value = (hottest_value*0.85) # minimises times when no joint is found
+
+	_,hm_thresh = cv2.threshold(heat_map,thresh_value,255,cv2.THRESH_BINARY)
+
+	contours,_ = cv2.findContours(hm_thresh,cv2.RETR_EXTERNAL,cv2.CHAIN_APPROX_NONE)
+
+	contours = sorted(contours, key=lambda x: cv2.contourArea(x))
+
+	k = min(len(contours),5)
+
+	largest_contours = contours[-k:]
+	for i in range(k):
+		M = cv2.moments(largest_contours[i])
+		centroids.append([int(M['m10']/M['m00']),int(M['m01']/M['m00'])])
+
+	# get distance to he_top and order them from closest to furthest
+	centroids = sorted(centroids, key=lambda x: distance_between_points(head_top_position,x))
+	centroids = [centroids[0]]
+	
+	cv2.drawContours(hm_thresh,largest_contours,-1,200,1)
+
+	#cv2.imshow('thresh',hm_thresh)
+	cv2.imwrite('thresh.png',hm_thresh)
+	#cv2.waitKey(0)
+	#cv2.destroyAllWindows()
+
+	return centroids
+
+def distance_between_points(a,b):
+	xd = a[0]-b[0]
+	yd = a[1]-b[1]
+	d = sqrt(xd**2 + yd**2)
+	#d = np.linalg.norm(a-b)
+	return d
 	
 def get_potential_joints(model,image):
 

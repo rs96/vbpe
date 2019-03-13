@@ -52,6 +52,18 @@ def mask_frame(frame,joint):
 
     return frame_masked
 
+def get_rectangle_pos(head_top_position,neck_position):
+
+	head_v = [head_top_position[0]-neck_position[0],head_top_position[1]-neck_position[1]]
+	mag = sqrt(head_v[0]**2 + head_v[1]**2)
+
+	top = head_top_position[1]-int(mag)
+	left = head_top_position[0]-40
+	bottom = neck_position[1]+int(mag*6)
+	right = neck_position[0]+40
+
+	return top,left,bottom,right
+
 def video_track():
     
 	# first two joints (head top and neck) used to draw box for joint finding
@@ -119,7 +131,10 @@ def video_track():
 					smaller_frames_to_process.append(smaller_frames[sf])
 					im_displacements.append([x_lefts[sf],y_tops[sf]])
 				hm,h_val = jd.get_heatmap(models[model_num],smaller_frames_to_process,im_displacements)
-				locations[model_num] = jd.get_k_centroids(hm,h_val,len(numofjoints[model_num]))
+				if(model_num==1):
+					locations[model_num] = jd.get_neck_centroid(hm,h_val,locations[model_num-1][0])
+				else:
+					locations[model_num] = jd.get_k_centroids(hm,h_val,len(numofjoints[model_num]))
 			except Exception as e:
 				print(e)
 				for sf in numofjoints[model_num]:
@@ -135,7 +150,10 @@ def video_track():
 					smaller_frames_to_process.append(frame)
 					im_displacements.append([x_lefts[sf],y_tops[sf]])
 				hm,h_val = jd.get_heatmap(models[model_num],smaller_frames_to_process,im_displacements)
-				locations[model_num] = jd.get_k_centroids(hm,h_val,len(numofjoints[model_num]))
+				if(model_num==1):
+					locations[model_num] = jd.get_neck_centroid(hm,h_val,locations[model_num-1][0])
+				else:
+					locations[model_num] = jd.get_k_centroids(hm,h_val,len(numofjoints[model_num]))
 				# maybe extrapolate from last position with velocity or something
 			print('locations found:',locations)
 			#try:
@@ -184,7 +202,6 @@ def video_track():
 					x_rights[jnum] = widths[jnum]
 
 			if(c%5==0):
-				print(locations[model_num])
 				for l in locations[model_num]:
 					cv2.circle(frame,(l[0],l[1]),3,[0,0,255],-1)
 				
@@ -193,6 +210,9 @@ def video_track():
 
 		# still should be larger than a single window size at least
 		if(c%5==0):
+			#draw rectangle for testing purposes of new 'good person box'
+			rectop,recleft,recbottom,recright = get_rectangle_pos(locations[0][0],locations[1][0])
+			cv2.rectangle(frame,(recleft,rectop),(recright,recbottom),[255,0,0],3)
 			cv2.imshow('frame',frame)
 			cv2.waitKey()
 			cv2.destroyAllWindows()
